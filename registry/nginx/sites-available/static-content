@@ -1,0 +1,13 @@
+    server {
+	location / {
+	    root /var/lib/www/html;
+	}
+
+	location /download {
+		gzip off;
+		fastcgi_pass unix:/var/run/fcgiwrap.socket;
+		include /etc/nginx/fastcgi_params;
+		fastcgi_param SCRIPT_FILENAME /var/lib/www/mdbe-build-repo-pkg;
+	}
+
+    }

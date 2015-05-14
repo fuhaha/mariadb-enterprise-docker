@@ -1,0 +1,23 @@
+#!/bin/bash
+
+# REQUEST_URI=/download/abcde-12345/mariadb-enterprise-repo.rpm
+
+re='^/download/([-[:alnum:]]+)/([-.[:alnum:]]+)'
+
+if ! [[ $REQUEST_URI =~ $re ]]; then
+   printf %s\\n 'Status: 403 Authorization Required' 'Content-Type: text/plain' '' \
+                'You must include an authorization token in your request URI.'
+   exit 1
+fi
+
+mdbe_token=${BASH_REMATCH[1]}
+filename=${BASH_REMATCH[2]}
+filetype="${filename##*.}"
+
+case $filetype in 
+	deb|rpm) : ;;
+	*) printf %s\\n 'Status: 401 Forbidden' 'Content-Type: text/plain' '' \
+		'Invalid filename requested. Please report this error.' ;;
+esac
+
+docker run --net=none --rm -e mdbe_token="$mdbe_token" docker.mariadb.com/mdbe-build-repo-"$filetype"

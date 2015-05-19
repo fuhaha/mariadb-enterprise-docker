@@ -7,7 +7,6 @@ RUN apt-get install -y software-properties-common \
 	&& apt-get update -y \
 	&& apt-get install -y mariadb-galera-server percona-xtrabackup galera-3 \
 	&& rm -f /etc/mysql/my.cnf
-#	&& sed -ri 's/^(bind-address|skip-networking)/;\1/' /etc/mysql/my.cnf
 
 VOLUME /var/lib/mysql
 

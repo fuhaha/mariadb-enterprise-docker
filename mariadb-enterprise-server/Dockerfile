@@ -4,7 +4,8 @@ MAINTAINER Kolbe Kegel <kolbe@mariadb.com>
 USER root
 COPY mdbe-token /tmp/
 COPY mdbe-version /tmp/
-COPY fetch-new-packages /tmp/
+COPY exe/ /usr/local/bin/
+COPY cnf/ /etc/my.cnf.d/
 
 # An empty mysql subdirectory is created in datadir to keep the RPM installer from running 
 # mysql_install_db, but it's removed right away so that the entrypoint script knows to run 
@@ -19,7 +20,7 @@ COPY fetch-new-packages /tmp/
 RUN mkdir -p /var/lib/mariadb-socket /var/lib/mariadb-load-data /var/lib/mysql/mysql /home/mariadb \
     && yum -y update \
     && yum -y install hostname \
-    && bash /tmp/fetch-new-packages \
+    && bash /usr/local/bin/mariadb-install-new-packages \
     && rmdir /var/lib/mysql/mysql \
     && rm /usr/lib64/libmysqld.so* \
           /usr/lib64/mysql/plugin/ha_spider.so \
@@ -31,13 +32,7 @@ RUN mkdir -p /var/lib/mariadb-socket /var/lib/mariadb-load-data /var/lib/mysql/m
     && rm -rf /var/tmp/yum* \
     && usermod -d /home/mariadb mysql
 
-COPY bootstrap.cnf.docker /etc/my.cnf.d/
-COPY docker.cnf /etc/my.cnf.d/
-COPY docker-entry.bash /bin/mariadb-enterprise-server
-COPY my_print_uidgid.bash /bin/my_print_uidgid
-COPY my_wait_socket.bash /bin/my_wait_socket
-
-RUN chmod 555 /bin/mariadb-enterprise-server /bin/my_print_uidgid /bin/my_wait_socket \
+RUN chmod 555 /usr/local/bin/mariadb-server-entry /usr/local/bin/my_print_uidgid /usr/local/bin/my_wait_socket \
     && chown -R mysql:mysql /var/lib/mariadb-socket /var/lib/mariadb-load-data /var/lib/mysql /home/mariadb
 
 USER mysql
@@ -49,4 +44,4 @@ EXPOSE 3306
 # the mysql client complains that TERM is not set
 ENV TERM dumb
 
-ENTRYPOINT ["mariadb-enterprise-server"]
+ENTRYPOINT ["mariadb-server-entry"]

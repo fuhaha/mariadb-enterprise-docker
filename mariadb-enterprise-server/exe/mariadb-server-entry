@@ -7,12 +7,16 @@
 #   Initialize empty datadir, or leave it alone?
 # mariadb_verbose_entry=0 boolean
 #   Should this entrypoint script output verbose info about its activities?
+# mariadb_database / MYSQL_DATABASE
+#   A database/schema to create
+# MYSQL_INITDB_SKIP_TZINFO
+#   Set this if you want to skip loading the time zone tables
 
 # bootstrap_cmds is used to hold commands that are executed by a bootstrap instance of mysqld
-# before the real server is started.
+# before the real server is started. This is available, but is not presently used by this script.
 declare -a bootstrap_cmds
 
-# This init_cmds thing is leftover from my previous attempt to use --init-file to set the root
+# This init_cmds thing is left over from a previous attempt to use --init-file to set the root
 # password. That didn't work out when starting mysqld as root using --user=mysql, which may be
 # necessary to use external volumes. I'm leaving it in case it has some use later.
 declare -a init_cmds
@@ -32,6 +36,18 @@ dbg=$mariadb_verbose_entry
 log() {
 	printf '%s\n' "$@" >&2
 }
+
+err() {
+        log "[ERROR] $*"
+        exit 1
+}
+
+# mariadb_database / MARIADB_DATABASE / MYSQL_DATABASE
+# Default: 1 to init, 0 to leave it empty/alone
+mariadb_database=${mariadb_database:-$MARIADB_DATABASE}
+mariadb_database=${mariadb_database:-$MYSQL_DATABASE}
+[[ $mariadb_database = *'`'* ]] && err 'The mariadb_database/MYSQL_DATABASE parameter cannot contain the backtick character'
+[[ $mariadb_database ]] && setup_cmds+=( "create database \`$mariadb_database\`" )
 
 # mariadb_init_empty_datadir / MARIADB_INIT_EMPTY_DATADIR
 # Default: 1 to init, 0 to leave it empty/alone
@@ -81,7 +97,7 @@ if ((mariadb_random_root_password)); then
 	declare -a my_cnf
 	[[ -e .my.cnf ]] || my_cnf+=('[client]' 'user=root')
 	my_cnf+=("password=$mypass")
-	printf %s\\n "${my_cnf[@]}" >> .my.cnf
+	( umask 077 ; printf %s\\n "${my_cnf[@]}" >> .my.cnf )
 fi
 rm -f /var/lib/mysql/docker_bootstrap
 
@@ -91,6 +107,21 @@ if ((${#bootstrap_cmds[@]})); then
 	printf '%s;\n' "${bootstrap_cmds[@]}"  |
   mysqld --defaults-extra-file=/etc/my.cnf.d/bootstrap.cnf.docker
 fi
+
+if [[ -z "$MYSQL_INITDB_SKIP_TZINFO" ]]; then
+    # sed is for https://bugs.mysql.com/bug.php?id=20545
+    #| sed 's/Local time zone must be set--see zic manual page/FCTY/' | "${mysql[@]}" mysql
+    mysql_tzinfo_to_sql /usr/share/zoneinfo > /tmp/tz.sql
+    setup_cmds+=( "use mysql; source /tmp/tz.sql;" )
+fi
+
+for f in /docker-entrypoint-initdb.d/*; do
+    case "$f" in
+        *.sh | *.bash) log "$0: running $f"; . "$f" ;;
+        *.sql) log "$0: running $f"; setup_cmds+=( "source $f;" ) ;;
+        *)     log "$0: ignoring $f" ;;
+    esac
+done
 
 if ((${#setup_cmds[@]})); then
 	((dbg)) && log "Executing setup_cmds"
@@ -104,6 +135,8 @@ if ((${#setup_cmds[@]})); then
 	done
 	mysql_embedded "${mysql_embedded_args[@]}"
 fi
+
+rm -f /tmp/tz.sql
 
 # As above, this init_cmds logic originally existed to support setting the password. It stays
 # in case it's of use later for setting something else.

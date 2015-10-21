@@ -2,9 +2,7 @@ FROM centos:7
 MAINTAINER Kolbe Kegel <kolbe@mariadb.com>
 
 USER root
-COPY mdbe-token /tmp/
-COPY mdbe-version /tmp/
-COPY exe/ /usr/local/bin/
+COPY mariadb.repo /etc/yum/repos.d/
 COPY cnf/ /etc/my.cnf.d/
 
 # An empty mysql subdirectory is created in datadir to keep the RPM installer from running 
@@ -19,18 +17,18 @@ COPY cnf/ /etc/my.cnf.d/
 
 RUN mkdir -p /var/lib/mariadb-socket /var/lib/mariadb-load-data /var/lib/mysql/mysql /home/mariadb \
     && yum -y update \
-    && yum -y install hostname \
-    && bash /usr/local/bin/mariadb-install-new-packages \
+    && yum -y install hostname MariaDB-server MariaDB-client \
     && rmdir /var/lib/mysql/mysql \
     && rm /usr/lib64/libmysqld.so* \
           /usr/lib64/mysql/plugin/ha_spider.so \
           /usr/lib64/mysql/plugin/ha_mroonga.so \
           /usr/lib64/mysql/plugin/ha_tokudb.so \
           /usr/lib64/mysql/plugin/ha_innodb.so \
-          /tmp/mdbe-token \
     && yum clean all \
     && rm -rf /var/tmp/yum* \
     && usermod -d /home/mariadb mysql
+
+COPY exe/ /usr/local/bin/
 
 RUN chmod 555 /usr/local/bin/mariadb-server-entry /usr/local/bin/my_print_uidgid /usr/local/bin/my_wait_socket \
     && chown -R mysql:mysql /var/lib/mariadb-socket /var/lib/mariadb-load-data /var/lib/mysql /home/mariadb

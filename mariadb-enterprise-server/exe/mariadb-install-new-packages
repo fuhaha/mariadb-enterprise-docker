@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+err(){
+    printf '[ERROR] %s\n' "$*" >&2
+    exit 1
+}
+
+token=$(</tmp/mdbe-token) || err 'no such file "mdbe-token"'
+mdbever=$(</tmp/mdbe-version) || err 'no such file "mdbe-token"'
+
+[[ $token ]] || err 'no MariaDB Enterprise Download Token defined'
+[[ $mdbever ]] || err 'no MariaDB Enterprise Server/Cluster Version defined'
+
+while IFS== read -r key val; do 
+    val=${val//\"/}
+    case $key in 
+        VERSION_ID) elver=$val ;;
+        ID) eltype=$val ;; 
+    esac
+done < /etc/os-release
+
+arch=$(uname -p)
+
+packages=( server client common shared )
+
+baseurl=http://downloads.mariadb.com/enterprise/$token/mariadb-enterprise/$mdbever/yum/rhel/$elver/$arch/rpms/
+
+yum=( yum -y install )
+
+for p in "${packages[@]}"; do 
+   yum+=( "$baseurl/MariaDB-$mdbever-centos$elver-$arch-$p.rpm" )
+done
+
+"${yum[@]}"
